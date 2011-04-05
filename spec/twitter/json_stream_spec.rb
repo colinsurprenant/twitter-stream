@@ -99,6 +99,12 @@ describe JSONStream do
       end
     end
     
+    it "should not reconnect on network failure" do
+      connect_stream(:auto_reconnect => false) do
+        stream.should_receive(:reconnect).never
+      end
+    end
+
     it "should reconnect with 0.25 at base" do
       connect_stream do
         stream.should_receive(:reconnect_after).with(0.25)
@@ -145,13 +151,18 @@ describe JSONStream do
       end
     end    
     
+    it "should not reconnect on inactivity" do
+      connect_stream(:stop_in => 1.5, :auto_reconnect => false) do
+        stream.should_receive(:reconnect).never    
+      end
+    end    
+
     it_should_behave_like "network failure"
   end
   
   context "on server unavailable" do
-    
     attr_reader :stream
-    
+
     # This is to make it so the network failure specs which call connect_stream  
     # can be reused. This way calls to connect_stream won't actually create a 
     # server to listen in.
@@ -167,8 +178,8 @@ describe JSONStream do
   context "on application failure" do
     attr_reader :stream
     before :each do
-      $data_to_send = 'HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm="Firehose"\r\n\r\n1'
-      $close_connection = true
+      $data_to_send = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"Firehose\"\r\n\r\n"
+      $close_connection = false
     end
     
     it "should reconnect on application failure 10 at base" do
@@ -177,6 +188,12 @@ describe JSONStream do
       end
     end
     
+    it "should not reconnect on application failure 10 at base" do
+      connect_stream(:auto_reconnect => false) do
+        stream.should_receive(:reconnect_after).never
+      end
+    end
+
     it "should reconnect with exponential timeout" do
       connect_stream do
         stream.af_last_reconnect = 160

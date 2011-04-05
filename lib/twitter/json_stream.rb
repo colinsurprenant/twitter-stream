@@ -20,21 +20,22 @@ module Twitter
     RETRIES_MAX     = 10
 
     DEFAULT_OPTIONS = {
-      :method       => 'GET',
-      :path         => '/',
-      :content_type => "application/x-www-form-urlencoded",
-      :content      => '',
-      :path         => '/1/statuses/filter.json',
-      :host         => 'stream.twitter.com',
-      :port         => 80,
-      :ssl          => false,
-      :user_agent   => 'TwitterStream',
-      :timeout      => 0,
-      :proxy        => ENV['HTTP_PROXY'],
-      :auth         => nil,
-      :oauth        => {},
-      :filters      => [],
-      :params       => {},
+      :method         => 'GET',
+      :path           => '/',
+      :content_type   => "application/x-www-form-urlencoded",
+      :content        => '',
+      :path           => '/1/statuses/filter.json',
+      :host           => 'stream.twitter.com',
+      :port           => 80,
+      :ssl            => false,
+      :user_agent     => 'TwitterStream',
+      :timeout        => 0,
+      :proxy          => ENV['HTTP_PROXY'],
+      :auth           => nil,
+      :oauth          => {},
+      :filters        => [],
+      :params         => {},
+      :auto_reconnect => true,
     }
 
     attr_accessor :code
@@ -88,6 +89,10 @@ module Twitter
     def on_max_reconnects &block
       @max_reconnects_callback = block
     end
+    
+    def on_close &block
+      @close_callback = block
+    end
 
     def stop
       @gracefully_closed = true
@@ -102,7 +107,8 @@ module Twitter
 
     def unbind
       receive_line(@buffer.flush) unless @buffer.empty?
-      schedule_reconnect unless @gracefully_closed
+      schedule_reconnect if @options[:auto_reconnect] && !@gracefully_closed
+      @close_callback.call if @close_callback
     end
 
     def receive_data data
@@ -154,7 +160,7 @@ module Twitter
         @immediate_reconnect = false
         return 0
       end
-
+      
       if (@code == 0) # network failure
         if @nf_last_reconnect
           @nf_last_reconnect += NF_RECONNECT_ADD
